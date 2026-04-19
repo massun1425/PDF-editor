@@ -31,11 +31,8 @@ window.addEventListener('DOMContentLoaded', () => {
         thumbList.innerHTML = previousHTML;
         updateUndoBtn();
         updateView();
-        
-        // innerHTMLを置き換えたのでSortableを再初期化
-        if (sortable) {
-            sortable.destroy();
-        }
+
+        if (sortable) sortable.destroy();
         reinitSortable();
     });
 
@@ -43,17 +40,16 @@ window.addEventListener('DOMContentLoaded', () => {
         sortable = new Sortable(thumbList, {
             animation: 150,
             ghostClass: 'sortable-ghost',
-            onStart: function() {
+            onStart: function () {
                 dragTempState = thumbList.innerHTML;
             },
-            onUpdate: function() {
+            onUpdate: function () {
                 undoStack.push(dragTempState);
                 updateUndoBtn();
             }
         });
     }
 
-    // View 切り替え（画面のステート管理）
     function updateView() {
         if (thumbList.children.length > 0) {
             uploadSection.style.display = 'none';
@@ -64,18 +60,14 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ボタンからのファイル選択
     selectFileBtn.addEventListener('click', () => fileInput.click());
     addMoreBtn.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
-        if (files.length > 0) {
-            handleFileUpload(files);
-        }
+        if (files.length > 0) handleFileUpload(files);
     });
 
-    // --- ドラッグアンドドロップの処理 ---
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.classList.add('dragover');
@@ -90,41 +82,25 @@ window.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         const files = Array.from(e.dataTransfer.files);
-        if (files.length > 0) {
-            handleFileUpload(files);
-        }
+        if (files.length > 0) handleFileUpload(files);
     });
 
     async function handleFileUpload(files) {
-        // UIの切り替えを先に行う
         workspaceSection.style.display = 'block';
         uploadSection.style.display = 'none';
-        
         statusDiv.textContent = 'Uploading...';
-        
-        // 処理中に保存ボタン等を無効化
         saveButton.disabled = true;
         clearButton.disabled = true;
         addMoreBtn.disabled = true;
 
-        if (sortable) {
-            sortable.destroy();
-            sortable = null;
-        }
+        if (sortable) { sortable.destroy(); sortable = null; }
 
         const formData = new FormData();
-        files.forEach(file => {
-            formData.append('pdf_files', file);
-        });
+        files.forEach(file => formData.append('pdf_files', file));
 
         try {
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
-
+            const response = await fetch('/upload', { method: 'POST', body: formData });
             const result = await response.json();
-
             if (response.ok) {
                 statusDiv.textContent = 'Files added. You can drag and drop to reorder.';
                 displayThumbnails(result.thumbnails);
@@ -137,15 +113,13 @@ window.addEventListener('DOMContentLoaded', () => {
             saveButton.disabled = false;
             clearButton.disabled = false;
             addMoreBtn.disabled = false;
-            fileInput.value = ''; // Reset input to allow submitting the same file again
+            fileInput.value = '';
             updateView();
         }
     }
 
     function displayThumbnails(thumbnails) {
-        if (thumbnails.length > 0 && thumbList.children.length > 0) {
-            pushState(); // 新しく追加する前の既存状態を保存
-        }
+        if (thumbnails.length > 0 && thumbList.children.length > 0) pushState();
 
         thumbnails.forEach((thumbInfo) => {
             const item = document.createElement('div');
@@ -153,12 +127,11 @@ window.addEventListener('DOMContentLoaded', () => {
             item.dataset.originalIndex = thumbInfo.original_index;
             item.dataset.sourceFile = thumbInfo.source_file;
 
-            // 削除ボタン
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-thumb-btn';
-            deleteBtn.innerHTML = '&times;'; // バツ印
+            deleteBtn.innerHTML = '&times;';
             deleteBtn.title = 'Remove this page';
-            
+
             const img = document.createElement('img');
             img.src = thumbInfo.path;
 
@@ -166,7 +139,6 @@ window.addEventListener('DOMContentLoaded', () => {
             infoDiv.className = 'thumb-info';
 
             const displayName = thumbInfo.source_file.split('_').slice(1).join('_');
-            
             const fileNameElem = document.createElement('p');
             fileNameElem.className = 'thumb-filename';
             fileNameElem.textContent = displayName;
@@ -177,7 +149,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
             infoDiv.appendChild(fileNameElem);
             infoDiv.appendChild(pageNumElem);
-
             item.appendChild(deleteBtn);
             item.appendChild(img);
             item.appendChild(infoDiv);
@@ -190,9 +161,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     clearButton.addEventListener('click', async () => {
         statusDiv.textContent = 'Clearing all files...';
-        saveButton.disabled = true;
-        clearButton.disabled = true;
-        addMoreBtn.disabled = true;
         try {
             const response = await fetch('/clear', { method: 'POST' });
             if (response.ok) {
@@ -200,119 +168,67 @@ window.addEventListener('DOMContentLoaded', () => {
                 undoStack = [];
                 updateUndoBtn();
                 statusDiv.textContent = '';
-                if (sortable) {
-                    sortable.destroy();
-                    sortable = null;
-                }
-                updateView(); // ここで初期画面に戻る
-            } else {
-                statusDiv.textContent = 'Failed to clear.';
+                if (sortable) { sortable.destroy(); sortable = null; }
+                updateView();
             }
-        } catch (error) {
-            statusDiv.textContent = `Network Error: ${error.message}`;
-        } finally {
-            saveButton.disabled = false;
-            clearButton.disabled = false;
-            addMoreBtn.disabled = false;
-        }
+        } catch (error) {}
     });
 
     saveButton.addEventListener('click', async () => {
-        if (!sortable) return;
         const items = thumbList.querySelectorAll('.thumbnail-item');
-        const neworder = Array.from(items).map(item => {
-            return {
-                filename: item.dataset.sourceFile,
-                page_index: parseInt(item.dataset.originalIndex, 10)
-            };
-        });
+        const neworder = Array.from(items).map(item => ({
+            filename: item.dataset.sourceFile,
+            page_index: parseInt(item.dataset.originalIndex, 10)
+        }));
 
         statusDiv.textContent = 'Merging PDFs...';
         saveButton.disabled = true;
-        clearButton.disabled = true;
-        addMoreBtn.disabled = true;
-
         try {
             const response = await fetch('/reorder', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    order: neworder
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: neworder })
             });
 
             if (response.ok) {
                 const blob = await response.blob();
-                const contentDisposition = response.headers.get('content-disposition');
-                let filename = 'reordered.pdf';
-
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/);
-                    if (filenameMatch && filenameMatch[1]) {
-                        filename = decodeURIComponent(filenameMatch[1]);
-                    }
-                }
-
                 const a = document.createElement('a');
                 const url = window.URL.createObjectURL(blob);
                 a.href = url;
-                a.download = filename;
+                a.download = 'reordered.pdf';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
                 window.URL.revokeObjectURL(url);
-
                 statusDiv.textContent = 'Download complete';
-            } else {
-                const result = await response.json();
-                statusDiv.textContent = `Error: ${result.error}`;
             }
         } catch (error) {
-            statusDiv.textContent = `Network Error: ${error.message}`;
+            statusDiv.textContent = 'Error during save.';
         } finally {
             saveButton.disabled = false;
-            clearButton.disabled = false;
-            addMoreBtn.disabled = false;
         }
     });
 
-    // ブラウザの再読み込み前・タブを閉じる際にサーバーのファイルをクリア
-    window.addEventListener('beforeunload', () => {
-        navigator.sendBeacon('/clear');
-    });
-
-    // --- ライトボックス機能（拡大表示＆スワイプ） ---
+    // --- Lightbox Logic ---
     const lightbox = document.getElementById('lightbox');
     const lbImg = document.getElementById('lb-img');
     const lbCaption = document.getElementById('lb-caption');
     const lbClose = document.getElementById('lb-close');
     const lbPrev = document.getElementById('lb-prev');
     const lbNext = document.getElementById('lb-next');
-
     let currentLightboxItem = null;
 
     thumbList.addEventListener('click', (e) => {
-        // ライトボックス表示処理
-        if (e.target.tagName === 'IMG' && e.target.closest('.thumbnail-item')) {
-            openLightbox(e.target.closest('.thumbnail-item'));
-        }
-        
-        // 削除ボタンクリック処理（イベント委譲）
+        const thumbItem = e.target.closest('.thumbnail-item');
+        if (e.target.tagName === 'IMG' && thumbItem) openLightbox(thumbItem);
+
         const delBtn = e.target.closest('.delete-thumb-btn');
         if (delBtn) {
             e.stopPropagation();
+            pushState();
             const item = delBtn.closest('.thumbnail-item');
-            if (item) {
-                pushState(); // 消す前の状態を保存
-                item.style.transform = 'scale(0.8)';
-                item.style.opacity = '0';
-                setTimeout(() => {
-                    item.remove();
-                    updateView();
-                }, 200);
-            }
+            item.remove();
+            updateView();
         }
     });
 
@@ -320,49 +236,38 @@ window.addEventListener('DOMContentLoaded', () => {
         currentLightboxItem = item;
         updateLightboxContent();
         lightbox.style.display = 'flex';
+        document.body.classList.add('no-scroll');
         document.addEventListener('keydown', handleLightboxKeydown);
     }
 
     function closeLightbox() {
+        if (!lightbox) return;
         lightbox.style.display = 'none';
+        document.body.classList.remove('no-scroll');
         currentLightboxItem = null;
         document.removeEventListener('keydown', handleLightboxKeydown);
     }
 
     function updateLightboxContent() {
         if (!currentLightboxItem) return;
-        const img = currentLightboxItem.querySelector('img');
-        lbImg.src = img.src;
-        
-        const filename = currentLightboxItem.querySelector('.thumb-filename').textContent;
-        const pagenum = currentLightboxItem.querySelector('.thumb-page').textContent;
-        lbCaption.textContent = `${filename} - ${pagenum}`;
-
-        const prevItem = currentLightboxItem.previousElementSibling;
-        const nextItem = currentLightboxItem.nextElementSibling;
-        lbPrev.style.display = prevItem && prevItem.classList.contains('thumbnail-item') ? 'block' : 'none';
-        lbNext.style.display = nextItem && nextItem.classList.contains('thumbnail-item') ? 'block' : 'none';
+        lbImg.src = currentLightboxItem.querySelector('img').src;
+        lbCaption.textContent = `${currentLightboxItem.querySelector('.thumb-filename').textContent} - ${currentLightboxItem.querySelector('.thumb-page').textContent}`;
+        lbPrev.style.display = currentLightboxItem.previousElementSibling ? 'block' : 'none';
+        lbNext.style.display = currentLightboxItem.nextElementSibling ? 'block' : 'none';
     }
 
-    function navLightbox(direction) {
-        if (!currentLightboxItem) return;
-        const targetItem = direction === -1 
-            ? currentLightboxItem.previousElementSibling 
-            : currentLightboxItem.nextElementSibling;
-        
-        if (targetItem && targetItem.classList.contains('thumbnail-item')) {
-            currentLightboxItem = targetItem;
+    function navLightbox(dir) {
+        const target = dir === -1 ? currentLightboxItem.previousElementSibling : currentLightboxItem.nextElementSibling;
+        if (target && target.classList.contains('thumbnail-item')) {
+            currentLightboxItem = target;
             updateLightboxContent();
         }
     }
 
-    lbClose.addEventListener('click', closeLightbox);
-    lightbox.addEventListener('click', (e) => {
-        if (e.target === lightbox) closeLightbox();
-    });
-
-    lbPrev.addEventListener('click', () => navLightbox(-1));
-    lbNext.addEventListener('click', () => navLightbox(1));
+    lbClose.onclick = closeLightbox;
+    lbPrev.onclick = () => navLightbox(-1);
+    lbNext.onclick = () => navLightbox(1);
+    lightbox.onclick = (e) => { if (e.target === lightbox) closeLightbox(); };
 
     function handleLightboxKeydown(e) {
         if (e.key === 'Escape') closeLightbox();
@@ -370,32 +275,5 @@ window.addEventListener('DOMContentLoaded', () => {
         else if (e.key === 'ArrowRight') navLightbox(1);
     }
 
-    let touchStartX = 0;
-    let touchEndX = 0;
-    lightbox.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
-    });
-    lightbox.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    });
-    function handleSwipe() {
-        if (touchEndX < touchStartX - 50) navLightbox(1);
-        if (touchEndX > touchStartX + 50) navLightbox(-1);
-    }
-
-    let isWheelThrottled = false;
-    lightbox.addEventListener('wheel', (e) => {
-        if (lightbox.style.display !== 'flex') return;
-        if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 20) {
-            e.preventDefault(); 
-            if (isWheelThrottled) return;
-            if (e.deltaX > 0) { navLightbox(1); } else { navLightbox(-1); }
-            isWheelThrottled = true;
-            setTimeout(() => { isWheelThrottled = false; }, 500);
-        }
-    }, { passive: false });
-
-    // 初期化
     updateView();
 });

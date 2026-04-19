@@ -1,0 +1,86 @@
+/* --- Lightbox (拡大表示 - 不動のセンター固定) --- */
+.lightbox {
+    display: none; /* JSで flex に切り替え */
+    position: fixed; /* ページスクロールに関わらず、画面（ビューポート）に対して固定 */
+    z-index: 9999;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%); /* 画面のど真ん中に配置 */
+    
+    width: 65vw;
+    max-width: 600px;
+    height: 85vh;
+    
+    background-color: rgba(30, 25, 20, 0.5);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 15px;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+/* 背景スクロール禁止用（JSでbodyに付与） */
+body.no-scroll {
+    overflow: hidden;
+}
+
+.lb-content {
+    max-width: 95%;
+    max-height: 85%;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    user-select: none;
+    object-fit: contain;
+    background-color: #fff;
+}
+
+.lb-close {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    color: white;
+    font-size: 50px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10001;
+    line-height: 1;
+}
+
+.lb-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--glass-bg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 40px;
+    padding: 10px 25px;
+    cursor: pointer;
+    border-radius: 12px;
+    z-index: 10001;
+    transition: all 0.3s;
+}
+
+.lb-prev { left: 30px; }
+.lb-next { right: 30px; }
+
+.lb-nav:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-50%) scale(1.05);
+}
+
+.lb-close:hover { color: #bbb; }
+
+#lb-caption {
+    color: white;
+    margin-top: 20px;
+    font-size: 1.1rem;
+    text-align: center;
+    font-weight: 600;
+}

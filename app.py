@@ -9,21 +9,19 @@ from flask import Flask, render_template, request, jsonify, send_file, session
 from pypdf import PdfReader, PdfWriter
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 # --- Production Configurations ---
-# Use environment variables for sensitive settings in production
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key-change-this-in-prod')
 app.config['DEBUG_MODE'] = os.environ.get('FLASK_DEBUG', 'True') == 'True'
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  
 app.config['UPLOAD_EXTENSIONS'] = ['.pdf']
 
-# 共通ベースディレクトリ
 BASE_STATIC_DIR = 'static'
 os.makedirs(BASE_STATIC_DIR, exist_ok=True)
 
 def cleanup_old_folders():
-    """24時間以上更新されていない古いユーザーディレクトリを削除"""
+    """Delete stale directories older than 24 hours."""
     now = time.time()
     for category in ['uploads', 'thumbnails']:
         base_path = os.path.join(BASE_STATIC_DIR, category)
@@ -33,22 +31,17 @@ def cleanup_old_folders():
             folder_path = os.path.join(base_path, folder_name)
             if not os.path.isdir(folder_path):
                 continue
-            # フォルダの最終更新時間をチェック (24時間 = 86400秒)
             if now - os.path.getmtime(folder_path) > 86400:
                 try:
                     shutil.rmtree(folder_path)
-                    print(f"Cleaned up stale directory: {folder_path}")
-                except Exception as e:
-                    print(f"Cleanup error: {e}")
+                except: pass
 
 def get_user_id():
-    """ユーザー固有のセッションIDを取得または生成"""
     if 'user_id' not in session:
         session['user_id'] = str(uuid.uuid4())
     return session['user_id']
 
 def get_user_dirs():
-    """ユーザー専用のディレクトリパスを取得し、存在しない場合は作成"""
     uid = get_user_id()
     dirs = {
         'upload': os.path.join(BASE_STATIC_DIR, 'uploads', uid),
@@ -58,12 +51,10 @@ def get_user_dirs():
         os.makedirs(path, exist_ok=True)
     return dirs
 
-# --- 1. メインページ ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# --- 2. PDFアップロードとサムネイル生成 ---
 @app.route('/upload', methods=['POST'])
 def upload_pdf():
     if 'pdf_files' not in request.files:
@@ -80,12 +71,10 @@ def upload_pdf():
             if file.filename == '':
                 continue
             
-            # 拡張子チェック
             file_ext = os.path.splitext(file.filename)[1].lower()
             if file_ext not in app.config['UPLOAD_EXTENSIONS']:
                 continue
 
-            # 安全なファイル名の生成
             filename = secure_filename(file.filename)
             timestamp = str(base_timestamp + idx)
             unique_name = f"{timestamp}_{filename}"
@@ -93,17 +82,15 @@ def upload_pdf():
             
             file.save(pdf_path)
 
-            # サムネイル生成 (PyMuPDF)
             doc = fitz.open(pdf_path)
             for i in range(len(doc)):
                 page = doc.load_page(i)
-                pix = page.get_pixmap(dpi=96)
+                pix = page.get_pixmap(dpi=72)
                 
                 thumb_filename = f"{timestamp}_page_{i}.png"
                 thumb_path = os.path.join(user_paths['thumbnail'], thumb_filename)
                 pix.save(thumb_path)
 
-                # ブラウザ用URL (ユーザーIDを含むパス)
                 uid = session['user_id']
                 all_thumbnails.append({
                     'path': f'static/thumbnails/{uid}/{thumb_filename}',
@@ -112,16 +99,12 @@ def upload_pdf():
                 })
             doc.close()
 
-        return jsonify({
-            'message': 'Success',
-            'thumbnails': all_thumbnails
-        })
+        return jsonify({'message': 'Success', 'thumbnails': all_thumbnails})
     
     except Exception as e:
         app.logger.error(f"Upload error: {e}")
         return jsonify({'error': 'Failed to process PDF'}), 500
 
-# --- 3. PDF並び替えと結合 ---
 @app.route('/reorder', methods=['POST'])
 def reorder_pdf():
     data = request.json
@@ -135,11 +118,9 @@ def reorder_pdf():
         output_stream = io.BytesIO()
         writer = PdfWriter()
         opened_files = {}
-        processed_files = set()
 
         try:
             for item in order_list:
-                # ブラウザから送られてきたファイル名を検証
                 filename = secure_filename(item.get('filename'))
                 page_index = item.get('page_index')
 
@@ -147,19 +128,16 @@ def reorder_pdf():
                     continue
 
                 if filename not in opened_files:
-                    # ユーザー専用ディレクトリ内のファイルのみ許可
                     file_path = os.path.join(user_paths['upload'], filename)
                     if not os.path.exists(file_path):
                         continue
                     opened_files[filename] = open(file_path, "rb")
-                    processed_files.add(filename)
 
                 reader = PdfReader(opened_files[filename])
                 writer.add_page(reader.pages[page_index])
 
             writer.write(output_stream)
             output_stream.seek(0)
-
         finally:
             for f in opened_files.values():
                 f.close()
@@ -170,17 +148,14 @@ def reorder_pdf():
             download_name="reordered.pdf",
             mimetype='application/pdf'
         )
-    
     except Exception as e:
         app.logger.error(f"Reorder error: {e}")
         return jsonify({'error': 'Failed to merge PDF'}), 500
 
-# --- 4. クリア処理 ---
 @app.route('/clear', methods=['POST'])
 def clear_all():
     user_paths = get_user_dirs()
     try:
-        # フォルダごと根こそぎ削除
         for path in user_paths.values():
             if os.path.exists(path):
                 shutil.rmtree(path)
@@ -188,13 +163,11 @@ def clear_all():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 定期的な全体クリーニング (オプション・起動時やatexitなどに配置可能)
-def system_cleanup():
-    """古いセッションフォルダなどの削除ロジック（必要に応じて実装）"""
-    pass
+@app.errorhandler(403)
+def forbidden(e):
+    app.logger.error(f"403 error: {e}")
+    return "403 Forbidden: Check folder permissions.", 403
 
 if __name__ == '__main__':
-    # Clean up old debris on startup
     cleanup_old_folders()
-    # Run development server
-    app.run(debug=app.config['DEBUG_MODE'])
+    app.run(debug=app.config['DEBUG_MODE'], host='0.0.0.0', port=8080)

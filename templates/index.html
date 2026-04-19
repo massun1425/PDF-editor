@@ -56,14 +56,16 @@
             </div>
         </main>
 
-        <!-- ライトボックス（拡大表示）用モーダル -->
-        <div id="lightbox" class="lightbox" style="display: none;">
-            <span id="lb-close" class="lb-close">&times;</span>
-            <button id="lb-prev" class="lb-nav lb-prev">&#10094;</button>
-            <img id="lb-img" class="lb-content">
-            <button id="lb-next" class="lb-nav lb-next">&#10095;</button>
-            <div id="lb-caption"></div>
-        </div>
+    </div>
+
+
+    <!-- ライトボックス（拡大表示）用モーダル（containerの外に出すことで画面中央固定を確実にする） -->
+    <div id="lightbox" class="lightbox" style="display: none;">
+        <span id="lb-close" class="lb-close">&times;</span>
+        <button id="lb-prev" class="lb-nav lb-prev">&#10094;</button>
+        <img id="lb-img" class="lb-content">
+        <button id="lb-next" class="lb-nav lb-next">&#10095;</button>
+        <div id="lb-caption"></div>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}?v=3"></script>
