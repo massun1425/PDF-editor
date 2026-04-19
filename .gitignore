@@ -1,0 +1,12 @@
+# 仮想環境
+.venv/
+venv_for_win/
+# Pythonの一時ファイル
+__pycache__/
+*.pyc
+# アプリの一時保存ファイル
+static/uploads/*
+static/thumbnails/*
+static/reordered/*
+# OS固有のファイル
+.DS_Store
