@@ -4,8 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDFeditor</title>
+    <title>PDF Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon/favicon-16x16.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon/favicon.ico') }}">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 </head>
 
@@ -13,7 +21,7 @@
     <div class="container">
         <header>
             <h1>PDF Editor</h1>
-            <p>PDFファイルのアップロードから、直感的なドラッグ＆ドロップでの並び替え・結合・削除</p>
+            <p>Effortlessly upload, reorder, merge, and delete PDF pages.</p>
         </header>
 
         <main>
@@ -21,9 +29,9 @@
             <div id="upload-section" class="upload-section">
                 <div id="drop-zone" class="drop-zone">
                     <div class="upload-icon">📄</div>
-                    <p class="drop-title">PDFファイルをここにドロップ</p>
-                    <p class="sub-text">または</p>
-                    <button id="select-file-btn" class="btn primary-btn">PDFファイルを選択</button>
+                    <p class="drop-title">Drop your PDF files here</p>
+                    <p class="sub-text">or</p>
+                    <button id="select-file-btn" class="btn primary-btn">Select PDF Files</button>
                     <!-- 非表示のファイルインプット -->
                     <input type="file" id="pdf-input" accept=".pdf" multiple>
                 </div>
@@ -33,12 +41,12 @@
             <div id="workspace-section" class="workspace-section" style="display: none;">
                 <div class="toolbar">
                     <div class="toolbar-left">
-                        <button id="add-more-btn" class="btn outlined-btn">＋ 追加</button>
-                        <button id="undo-btn" class="btn outlined-btn" disabled>↩ 元に戻す</button>
-                        <button id="clear-button" class="btn danger-btn">全てクリア</button>
+                        <button id="add-more-btn" class="btn outlined-btn">＋ Add Files</button>
+                        <button id="undo-btn" class="btn outlined-btn" disabled>↩ Undo</button>
+                        <button id="clear-button" class="btn danger-btn">Clear All</button>
                     </div>
                     <div class="toolbar-right">
-                        <button id="save-button" class="btn success-btn">並び替えて保存</button>
+                        <button id="save-button" class="btn success-btn">Save PDF</button>
                     </div>
                 </div>
 

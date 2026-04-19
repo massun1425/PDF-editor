@@ -1,216 +1,200 @@
-import sys
 import os
 import fitz
-from flask import Flask, render_template, request, jsonify, g, send_file
 import time
-from pypdf import PdfReader, PdfWriter
 import io
 import atexit
+import uuid
+import shutil
+from flask import Flask, render_template, request, jsonify, send_file, session
+from pypdf import PdfReader, PdfWriter
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-THUMBNAIL_DIR = os.path.join('static', 'thumbnails')
+# --- Production Configurations ---
+# Use environment variables for sensitive settings in production
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key-change-this-in-prod')
+app.config['DEBUG_MODE'] = os.environ.get('FLASK_DEBUG', 'True') == 'True'
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  
+app.config['UPLOAD_EXTENSIONS'] = ['.pdf']
 
-UPLOAD_DIR = os.path.join('static', 'uploads')
+# 共通ベースディレクトリ
+BASE_STATIC_DIR = 'static'
+os.makedirs(BASE_STATIC_DIR, exist_ok=True)
 
-REORDERED_DIR = os.path.join('static', 'reordered')
+def cleanup_old_folders():
+    """24時間以上更新されていない古いユーザーディレクトリを削除"""
+    now = time.time()
+    for category in ['uploads', 'thumbnails']:
+        base_path = os.path.join(BASE_STATIC_DIR, category)
+        if not os.path.exists(base_path):
+            continue
+        for folder_name in os.listdir(base_path):
+            folder_path = os.path.join(base_path, folder_name)
+            if not os.path.isdir(folder_path):
+                continue
+            # フォルダの最終更新時間をチェック (24時間 = 86400秒)
+            if now - os.path.getmtime(folder_path) > 86400:
+                try:
+                    shutil.rmtree(folder_path)
+                    print(f"Cleaned up stale directory: {folder_path}")
+                except Exception as e:
+                    print(f"Cleanup error: {e}")
 
-app.config['THUMBNAIL_DIR'] = THUMBNAIL_DIR
-app.config['UPLOAD_DIR'] = UPLOAD_DIR
-# reorderはもういらない
-app.config['REORDERED_DIR'] = REORDERED_DIR
+def get_user_id():
+    """ユーザー固有のセッションIDを取得または生成"""
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    return session['user_id']
 
-# フォルダがなければ作成
-os.makedirs(THUMBNAIL_DIR, exist_ok=True)
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(REORDERED_DIR, exist_ok=True)
+def get_user_dirs():
+    """ユーザー専用のディレクトリパスを取得し、存在しない場合は作成"""
+    uid = get_user_id()
+    dirs = {
+        'upload': os.path.join(BASE_STATIC_DIR, 'uploads', uid),
+        'thumbnail': os.path.join(BASE_STATIC_DIR, 'thumbnails', uid),
+    }
+    for path in dirs.values():
+        os.makedirs(path, exist_ok=True)
+    return dirs
 
-# --- 1. メインページを表示するルート ---
+# --- 1. メインページ ---
 @app.route('/')
 def index():
-    """
-    ブラウザが http://127.0.0.1:5000/ にアクセスした時
-    templates/index.html を読み込んで表示する
-    """
     return render_template('index.html')
 
-# --- 2. PDFアップロードとサムネイル生成のルート ---
+# --- 2. PDFアップロードとサムネイル生成 ---
 @app.route('/upload', methods=['POST'])
 def upload_pdf():
-    """
-    ブラウザからPDFファイルがPOST送信された時の処理
-    """
-    # if 'pdf_file' not in request.files:
-    #     return jsonify({'error': 'ファイルがありません'}), 400
+    if 'pdf_files' not in request.files:
+        return jsonify({'error': 'No files provided'}), 400
     
-    # file = request.files['pdf_file']
-    # if file.filename == '':
-    #     return jsonify({'error': 'ファイルが選択されていません'}), 400
     files = request.files.getlist('pdf_files')
-
+    user_paths = get_user_dirs()
     all_thumbnails = []
-
-    try:
-        base_timestamp = int(time.time() * 1000)  # ミリ秒単位のタイムスタンプ
-        file_index = 0
     
-        for file in files:
+    try:
+        base_timestamp = int(time.time() * 1000)
+        
+        for idx, file in enumerate(files):
             if file.filename == '':
                 continue
+            
+            # 拡張子チェック
+            file_ext = os.path.splitext(file.filename)[1].lower()
+            if file_ext not in app.config['UPLOAD_EXTENSIONS']:
+                continue
 
-            if file and file.filename.endswith('.pdf'):
-                # 安全なファイル名で一時保存（各ファイルに固有のタイムスタンプを付与）
-                timestamp = str(base_timestamp + file_index)
-                file_index += 1
-                original_filename = file.filename
-                pdf_filename = f"{timestamp}_{original_filename}"
-                pdf_path = os.path.join(app.config['UPLOAD_DIR'], pdf_filename)
-                file.save(pdf_path)
+            # 安全なファイル名の生成
+            filename = secure_filename(file.filename)
+            timestamp = str(base_timestamp + idx)
+            unique_name = f"{timestamp}_{filename}"
+            pdf_path = os.path.join(user_paths['upload'], unique_name)
+            
+            file.save(pdf_path)
 
-                # PyMuPDFでPDFを開き、サムネイルを生成
-                doc = fitz.open(pdf_path)
+            # サムネイル生成 (PyMuPDF)
+            doc = fitz.open(pdf_path)
+            for i in range(len(doc)):
+                page = doc.load_page(i)
+                pix = page.get_pixmap(dpi=96)
+                
+                thumb_filename = f"{timestamp}_page_{i}.png"
+                thumb_path = os.path.join(user_paths['thumbnail'], thumb_filename)
+                pix.save(thumb_path)
 
-                for i in range(len(doc)):
-                    page = doc.load_page(i)
-                    pix = page.get_pixmap(dpi=96) # Web表示用にDPIを調整
+                # ブラウザ用URL (ユーザーIDを含むパス)
+                uid = session['user_id']
+                all_thumbnails.append({
+                    'path': f'static/thumbnails/{uid}/{thumb_filename}',
+                    'original_index': i,
+                    'source_file': unique_name
+                })
+            doc.close()
 
-                    # サムネイル画像のファイル名を決定
-                    thumb_filename = f"{timestamp}_page_{i}.png"
-                    thumb_path_static = os.path.join(app.config['THUMBNAIL_DIR'], thumb_filename)
-
-                    # サムネイル保存
-                    pix.save(thumb_path_static)
-
-                    #ブラウザが参照できるパスをリストに追加
-                    # os.path.join は \ を使うことがあるため、URLは / で結合
-                    all_thumbnails.append({
-                        'path': f'static/thumbnails/{thumb_filename}',
-                        'original_index': i,
-                        'source_file': pdf_filename
-                    })
-
-                doc.close()
-
-        # ブラウザに「成功」と「画像パスのリスト」と「元のPDF名」を返す
         return jsonify({
-            'message': '成功',
+            'message': 'Success',
             'thumbnails': all_thumbnails
         })
     
     except Exception as e:
-        print(f"エラー: {e}") # ★ デバッグ用にエラーログ
-        return jsonify({'error': 'PDF処理中にエラーが発生しました'}), 500
+        app.logger.error(f"Upload error: {e}")
+        return jsonify({'error': 'Failed to process PDF'}), 500
 
-    return jsonify({'error':'PDFファイルのみ対応しています'}), 400
-
-# --- 3. PDF並び替えのルート ---
+# --- 3. PDF並び替えと結合 ---
 @app.route('/reorder', methods=['POST'])
 def reorder_pdf():
     data = request.json
     order_list = data.get('order')
+    user_paths = get_user_dirs()
 
     if not order_list:
-        return jsonify({'error': '必要なデータがありません'}), 400
+        return jsonify({'error': 'Invalid order data'}), 400
 
     try:
-
-        # メモリ上のファイルオブジェクトを作成
         output_stream = io.BytesIO()
         writer = PdfWriter()
-
         opened_files = {}
-        used_filenames = set()
+        processed_files = set()
 
         try:
             for item in order_list:
-                filename = item.get('filename')
+                # ブラウザから送られてきたファイル名を検証
+                filename = secure_filename(item.get('filename'))
                 page_index = item.get('page_index')
 
                 if not filename or page_index is None:
                     continue
 
-                used_filenames.add(filename)
-
-                #まだ開いていないファイルから開く
                 if filename not in opened_files:
-                    file_path = os.path.join(app.config['UPLOAD_DIR'], filename)
+                    # ユーザー専用ディレクトリ内のファイルのみ許可
+                    file_path = os.path.join(user_paths['upload'], filename)
                     if not os.path.exists(file_path):
-                        print(f"ファイルが見つかりません: {file_path}")
                         continue
-                    # ファイルオブジェクトを辞書に保存
                     opened_files[filename] = open(file_path, "rb")
+                    processed_files.add(filename)
 
                 reader = PdfReader(opened_files[filename])
-
                 writer.add_page(reader.pages[page_index])
 
             writer.write(output_stream)
             output_stream.seek(0)
 
         finally:
-            # 最後に開いたファイルを全て閉じる
             for f in opened_files.values():
                 f.close()
 
-        # お掃除処理
-        for filename in used_filenames:
-            pdf_path = os.path.join(app.config['UPLOAD_DIR'], filename)
-            if os.path.exists(pdf_path):
-                try:
-                    os.remove(pdf_path)
-                except Exception as e:
-                    print(f"ファイル削除エラー: {e}")
-            timestamp = filename.split('_')[0]
-            try:
-                for f in os.listdir(app.config['THUMBNAIL_DIR']):
-                    #ファイル名が一致するサムネイルを探して削除
-                    if f.startswith(timestamp + "_page_"):
-                        thumb_path = os.path.join(app.config['THUMBNAIL_DIR'], f)
-                        try:
-                            os.remove(thumb_path)
-                        except OSError:
-                            pass
-            except Exception as e:
-                print(f"削除エラー(Thumb): {e}")
-        
-            # ★ 成功したら、ファイルをブラウザにダウンロードさせる
-            
         return send_file(
             output_stream,
             as_attachment=True,
-            download_name=f"merged_reordered.pdf", # "並び替え済み_" を "reordered_" に変更
+            download_name="reordered.pdf",
             mimetype='application/pdf'
         )
     
     except Exception as e:
-        print(f"並べ替えエラー: {e}")
-        return jsonify({'error': 'PDFの並べ替え中にエラーが発生しました'}), 500
+        app.logger.error(f"Reorder error: {e}")
+        return jsonify({'error': 'Failed to merge PDF'}), 500
 
-# --- フォルダのクリーンアップ処理（アプリ終了時・リロード時） ---
-def clean_all_directories():
-    directories = [app.config['UPLOAD_DIR'], app.config['THUMBNAIL_DIR'], app.config['REORDERED_DIR']]
-    for directory in directories:
-        if os.path.exists(directory):
-            for filename in os.listdir(directory):
-                file_path = os.path.join(directory, filename)
-                if os.path.isfile(file_path):
-                    try:
-                        os.remove(file_path)
-                    except OSError:
-                        pass
-
-# アプリ終了時にフォルダを掃除するフックを登録
-atexit.register(clean_all_directories)
-
-# --- 4. ファイル全体のクリアのルート ---
+# --- 4. クリア処理 ---
 @app.route('/clear', methods=['POST'])
 def clear_all():
+    user_paths = get_user_dirs()
     try:
-        clean_all_directories()
-        return jsonify({'message': 'クリアしました'})
+        # フォルダごと根こそぎ削除
+        for path in user_paths.values():
+            if os.path.exists(path):
+                shutil.rmtree(path)
+        return jsonify({'message': 'Session cleared'})
     except Exception as e:
-        print(f"クリアエラー: {e}")
-        return jsonify({'error': 'ファイルの削除中にエラーが発生しました'}), 500
+        return jsonify({'error': str(e)}), 500
+
+# 定期的な全体クリーニング (オプション・起動時やatexitなどに配置可能)
+def system_cleanup():
+    """古いセッションフォルダなどの削除ロジック（必要に応じて実装）"""
+    pass
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Clean up old debris on startup
+    cleanup_old_folders()
+    # Run development server
+    app.run(debug=app.config['DEBUG_MODE'])

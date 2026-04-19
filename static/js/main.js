@@ -100,7 +100,7 @@ window.addEventListener('DOMContentLoaded', () => {
         workspaceSection.style.display = 'block';
         uploadSection.style.display = 'none';
         
-        statusDiv.textContent = 'アップロード中...';
+        statusDiv.textContent = 'Uploading...';
         
         // 処理中に保存ボタン等を無効化
         saveButton.disabled = true;
@@ -126,13 +126,13 @@ window.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
 
             if (response.ok) {
-                statusDiv.textContent = '追加が完了しました。ドラッグ＆ドロップで並び替えできます。';
+                statusDiv.textContent = 'Files added. You can drag and drop to reorder.';
                 displayThumbnails(result.thumbnails);
             } else {
-                statusDiv.textContent = `エラー: ${result.error}`;
+                statusDiv.textContent = `Error: ${result.error}`;
             }
         } catch (error) {
-            statusDiv.textContent = `ネットワークエラー: ${error.message}`;
+            statusDiv.textContent = `Network Error: ${error.message}`;
         } finally {
             saveButton.disabled = false;
             clearButton.disabled = false;
@@ -157,7 +157,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-thumb-btn';
             deleteBtn.innerHTML = '&times;'; // バツ印
-            deleteBtn.title = 'このページを削除';
+            deleteBtn.title = 'Remove this page';
             
             const img = document.createElement('img');
             img.src = thumbInfo.path;
@@ -173,7 +173,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             const pageNumElem = document.createElement('p');
             pageNumElem.className = 'thumb-page';
-            pageNumElem.textContent = `ページ ${thumbInfo.original_index + 1}`;
+            pageNumElem.textContent = `Page ${thumbInfo.original_index + 1}`;
 
             infoDiv.appendChild(fileNameElem);
             infoDiv.appendChild(pageNumElem);
@@ -189,7 +189,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     clearButton.addEventListener('click', async () => {
-        statusDiv.textContent = '全ファイルをクリアしています...';
+        statusDiv.textContent = 'Clearing all files...';
         saveButton.disabled = true;
         clearButton.disabled = true;
         addMoreBtn.disabled = true;
@@ -206,10 +206,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
                 updateView(); // ここで初期画面に戻る
             } else {
-                statusDiv.textContent = 'クリアに失敗しました。';
+                statusDiv.textContent = 'Failed to clear.';
             }
         } catch (error) {
-            statusDiv.textContent = `ネットワークエラー: ${error.message}`;
+            statusDiv.textContent = `Network Error: ${error.message}`;
         } finally {
             saveButton.disabled = false;
             clearButton.disabled = false;
@@ -227,7 +227,7 @@ window.addEventListener('DOMContentLoaded', () => {
             };
         });
 
-        statusDiv.textContent = 'PDFを結合中...';
+        statusDiv.textContent = 'Merging PDFs...';
         saveButton.disabled = true;
         clearButton.disabled = true;
         addMoreBtn.disabled = true;
@@ -264,13 +264,13 @@ window.addEventListener('DOMContentLoaded', () => {
                 a.remove();
                 window.URL.revokeObjectURL(url);
 
-                statusDiv.textContent = 'PDFのダウンロードが完了しました';
+                statusDiv.textContent = 'Download complete';
             } else {
                 const result = await response.json();
-                statusDiv.textContent = `エラー: ${result.error}`;
+                statusDiv.textContent = `Error: ${result.error}`;
             }
         } catch (error) {
-            statusDiv.textContent = `ネットワークエラー: ${error.message}`;
+            statusDiv.textContent = `Network Error: ${error.message}`;
         } finally {
             saveButton.disabled = false;
             clearButton.disabled = false;
