@@ -29,11 +29,11 @@
             <div id="upload-section" class="upload-section">
                 <div id="drop-zone" class="drop-zone">
                     <div class="upload-icon">📄</div>
-                    <p class="drop-title">Drop your PDF files here</p>
+                    <p class="drop-title">Drop your PDF or Image files here</p>
                     <p class="sub-text">or</p>
-                    <button id="select-file-btn" class="btn primary-btn">Select PDF Files</button>
+                    <button id="select-file-btn" class="btn primary-btn">Select Files</button>
                     <!-- 非表示のファイルインプット -->
-                    <input type="file" id="pdf-input" accept=".pdf" multiple>
+                    <input type="file" id="pdf-input" accept=".pdf,.jpg,.jpeg,.png" multiple>
                 </div>
             </div>
 
@@ -46,6 +46,12 @@
                         <button id="clear-button" class="btn danger-btn">Clear All</button>
                     </div>
                     <div class="toolbar-right">
+                        <div class="password-wrapper">
+                            <input type="password" id="pdf-password" placeholder="Password (Optional)" title="Set a password to protect the PDF">
+                            <button type="button" id="toggle-password" title="Show/Hide Password">
+                                <img src="static/css/visibility_off_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.png" alt="Toggle Visibility">
+                            </button>
+                        </div>
                         <button id="save-button" class="btn success-btn">Save PDF</button>
                     </div>
                 </div>

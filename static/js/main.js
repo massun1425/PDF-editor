@@ -132,8 +132,16 @@ window.addEventListener('DOMContentLoaded', () => {
             deleteBtn.innerHTML = '&times;';
             deleteBtn.title = 'Remove this page';
 
+            const rotateBtn = document.createElement('button');
+            rotateBtn.className = 'rotate-thumb-btn';
+            rotateBtn.innerHTML = '↻';
+            rotateBtn.title = 'Rotate 90° clockwise';
+
             const img = document.createElement('img');
             img.src = thumbInfo.path;
+            
+            // 初期回転角を設定
+            item.dataset.rotation = 0;
 
             const infoDiv = document.createElement('div');
             infoDiv.className = 'thumb-info';
@@ -150,6 +158,7 @@ window.addEventListener('DOMContentLoaded', () => {
             infoDiv.appendChild(fileNameElem);
             infoDiv.appendChild(pageNumElem);
             item.appendChild(deleteBtn);
+            item.appendChild(rotateBtn);
             item.appendChild(img);
             item.appendChild(infoDiv);
             thumbList.appendChild(item);
@@ -175,10 +184,12 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     saveButton.addEventListener('click', async () => {
+        const password = document.getElementById('pdf-password').value;
         const items = thumbList.querySelectorAll('.thumbnail-item');
         const neworder = Array.from(items).map(item => ({
             filename: item.dataset.sourceFile,
-            page_index: parseInt(item.dataset.originalIndex, 10)
+            page_index: parseInt(item.dataset.originalIndex, 10),
+            rotation: parseInt(item.dataset.rotation || 0, 10)
         }));
 
         statusDiv.textContent = 'Merging PDFs...';
@@ -187,7 +198,10 @@ window.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/reorder', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ order: neworder })
+                body: JSON.stringify({ 
+                    order: neworder,
+                    password: password 
+                })
             });
 
             if (response.ok) {
@@ -195,7 +209,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 const a = document.createElement('a');
                 const url = window.URL.createObjectURL(blob);
                 a.href = url;
-                a.download = 'reordered.pdf';
+                a.download = 'edited.pdf';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -221,6 +235,18 @@ window.addEventListener('DOMContentLoaded', () => {
     thumbList.addEventListener('click', (e) => {
         const thumbItem = e.target.closest('.thumbnail-item');
         if (e.target.tagName === 'IMG' && thumbItem) openLightbox(thumbItem);
+
+        const rotateBtn = e.target.closest('.rotate-thumb-btn');
+        if (rotateBtn) {
+            e.stopPropagation();
+            const item = rotateBtn.closest('.thumbnail-item');
+            const img = item.querySelector('img');
+            let rotation = parseInt(item.dataset.rotation || 0, 10);
+            rotation = (rotation + 90) % 360;
+            item.dataset.rotation = rotation;
+            img.style.transform = `rotate(${rotation}deg)`;
+            return;
+        }
 
         const delBtn = e.target.closest('.delete-thumb-btn');
         if (delBtn) {
@@ -251,6 +277,10 @@ window.addEventListener('DOMContentLoaded', () => {
     function updateLightboxContent() {
         if (!currentLightboxItem) return;
         lbImg.src = currentLightboxItem.querySelector('img').src;
+        // 拡大表示にも現在の回転角を適用
+        const rotation = currentLightboxItem.dataset.rotation || 0;
+        lbImg.style.transform = `rotate(${rotation}deg)`;
+        
         lbCaption.textContent = `${currentLightboxItem.querySelector('.thumb-filename').textContent} - ${currentLightboxItem.querySelector('.thumb-page').textContent}`;
         lbPrev.style.display = currentLightboxItem.previousElementSibling ? 'block' : 'none';
         lbNext.style.display = currentLightboxItem.nextElementSibling ? 'block' : 'none';
@@ -273,6 +303,25 @@ window.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape') closeLightbox();
         else if (e.key === 'ArrowLeft') navLightbox(-1);
         else if (e.key === 'ArrowRight') navLightbox(1);
+    }
+
+    // --- Password Toggle ---
+    const togglePassword = document.getElementById('toggle-password');
+    const pdfPassword = document.getElementById('pdf-password');
+
+    if (togglePassword && pdfPassword) {
+        const toggleImg = togglePassword.querySelector('img');
+        togglePassword.addEventListener('click', () => {
+            const isPassword = pdfPassword.getAttribute('type') === 'password';
+            pdfPassword.setAttribute('type', isPassword ? 'text' : 'password');
+            if (toggleImg) {
+                toggleImg.src = isPassword 
+                    ? 'static/css/visibility_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.png' 
+                    : 'static/css/visibility_off_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.png';
+            }
+            // 表示モード時はレタースペーシングを元に戻す
+            pdfPassword.style.letterSpacing = isPassword ? 'normal' : '0.1em';
+        });
     }
 
     updateView();

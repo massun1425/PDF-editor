@@ -109,6 +109,15 @@ header p {
     background-color: var(--primary-hover);
 }
 
+.toolbar-right {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+}
+
 .outlined-btn {
     background-color: rgba(255, 255, 255, 0.6);
     color: var(--primary-color);
@@ -119,6 +128,88 @@ header p {
     background-color: rgba(255, 255, 255, 0.9);
 }
 
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+#pdf-password {
+    background: rgba(255, 255, 255, 0.15);
+    border: 2px solid var(--accent-color);
+    /* 枠線を太く強調 */
+    border-radius: 8px;
+    padding: 0 45px 0 15px;
+    /* 右側にトグルアイコン用の余白 */
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 1.4rem;
+    /* 入力文字を大きく */
+    letter-spacing: 0.1em;
+    width: 220px;
+    height: 42px;
+    /* 他のボタンの高さに合わせる */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    box-sizing: border-box;
+    /* 入力エリアとしての質感を出すための内影 */
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#pdf-password:focus {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #f3cf7a; /* より明るいゴールドに */
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 12px rgba(243, 207, 122, 0.4);
+}
+
+#pdf-password::placeholder {
+    color: var(--text-muted);
+    opacity: 0.8;
+    letter-spacing: normal;
+    font-size: 1.1rem;
+    /* プレースホルダーの文字を大きく */
+}
+
+#toggle-password {
+    position: absolute;
+    right: 10px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+#toggle-password img {
+    width: 24px;
+    height: 24px;
+    display: block;
+    pointer-events: none;
+    /* 画像のクリックを無効化しボタンのクリックを優先 */
+}
+
+#toggle-password:hover {
+    opacity: 1;
+}
+
+#pdf-password::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+    letter-spacing: normal;
+    font-size: 0.9rem;
+}
+
+#pdf-password:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #d4af37;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.btn-primary,
 .success-btn {
     background-color: var(--success-color);
     color: white;
@@ -238,10 +329,10 @@ header p {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
 }
 
-.delete-thumb-btn {
+.delete-thumb-btn,
+.rotate-thumb-btn {
     position: absolute;
     top: 5px;
-    right: 5px;
     background: var(--danger-color);
     color: white;
     border: none;
@@ -254,6 +345,23 @@ header p {
     align-items: center;
     justify-content: center;
     opacity: 0.8;
+    z-index: 10;
+    transition: all 0.2s;
+}
+
+.delete-thumb-btn {
+    right: 5px;
+}
+
+.rotate-thumb-btn {
+    left: 5px;
+    background: var(--primary-color);
+}
+
+.delete-thumb-btn:hover,
+.rotate-thumb-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
 }
 
 .thumbnail-item img {
@@ -262,6 +370,8 @@ header p {
     object-fit: contain;
     padding: 10px;
     box-sizing: border-box;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* 回転をスムーズに */
 }
 
 .thumb-info {
